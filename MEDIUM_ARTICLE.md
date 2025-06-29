@@ -4,13 +4,27 @@
 
 ---
 
+## 🎤 Presentation Overview: From Research to Real-World Impact
+
+*Presented by Vitoria Soria and Livia Ellen at the University of San Francisco*
+
+This project represents the culmination of our journey into the intersection of deep learning and digital dentistry. What started as an academic exploration evolved into a practical solution with real clinical applications. Our presentation highlighted how we transformed a traditionally manual, time-consuming dental workflow into an automated, AI-powered system.
+
+**[SCREENSHOT PLACEHOLDER: Slide 1 - Title slide showing "3D Teeth Segmentation and Generative AI" with our names and university affiliation]**
+
+---
+
 ## The Problem: Why Dental AI Matters
 
 Imagine visiting your dentist and having your entire mouth scanned in seconds, with AI instantly identifying every tooth, detecting potential issues, and planning your treatment automatically. This isn't science fiction—it's the future of digital dentistry, and it's happening now.
 
 Traditional dental workflows require manual tooth identification and segmentation from 3D scans, a time-consuming process that can take hours for complex cases. With over **2.3 billion people** suffering from dental caries worldwide, automating this process could revolutionize dental care accessibility and accuracy.
 
-**[SCREENSHOT PLACEHOLDER 1: 3D dental scan visualization from your notebook - the interactive plotly visualization of the sample dental mesh with colored teeth]**
+**The Challenge**: In digital dentistry, one of the most time-consuming tasks is identifying and segmenting each individual tooth from a 3D intraoral scan. This process is traditionally done manually by clinicians or technicians, which is not only labor-intensive but also prone to inconsistency.
+
+With the rise of AI in healthcare, we saw an opportunity to automate this process—making it faster, more accurate, and scalable. That's the motivation behind our project.
+
+**[SCREENSHOT PLACEHOLDER: Slide 2 - Problem statement slide showing manual vs automated segmentation workflow]**
 
 ## The Challenge: Why 3D Teeth Segmentation is Hard
 
@@ -31,11 +45,20 @@ Traditional dental workflows require manual tooth identification and segmentatio
 - **Variable point density**: Intraoral scanners produce irregular mesh patterns
 - **Real-time requirements**: Clinical workflows need fast processing
 
-**[SCREENSHOT PLACEHOLDER 2: Data preprocessing visualization showing the point cloud normalization and augmentation steps]**
-
 ## The Solution: Deep Learning Meets Dentistry
 
-We developed a comprehensive solution using two cutting-edge neural architectures specifically designed for 3D point cloud processing:
+We developed a comprehensive solution using cutting-edge neural architectures specifically designed for 3D point cloud processing. Here's our **algorithm pipeline**—the backbone of our approach:
+
+### 🔄 **Complete Algorithm Pipeline**
+
+1. **Preprocessing** – We start by cleaning and normalizing the raw mesh scans to reduce noise and standardize inputs.
+2. **Feature Extraction** – Then, we compute geometric features like curvature and surface normals, which help the model better understand the structure of the teeth.
+3. **Segmentation** – This is where the deep learning happens. We use neural networks to classify each point in the 3D scan into a tooth category.
+4. **Post-processing** – Finally, we refine the segmentation results to ensure label consistency and anatomical accuracy across the full jaw.
+
+This pipeline allowed us to transform messy raw scans into structured, clinically meaningful data.
+
+**[SCREENSHOT PLACEHOLDER: Slide 3 - Algorithm pipeline diagram showing the 4-step process]**
 
 ### 🚀 **Architecture 1: PointNet**
 PointNet, pioneered by researchers at Stanford, was the first neural network capable of directly processing 3D point clouds without converting them to voxels or images.
@@ -60,11 +83,15 @@ class PointNetSegmentation(nn.Module):
 
 **Key Innovation**: PointNet uses **permutation invariance**—it doesn't matter what order the points are in, the network produces the same result. This is crucial for 3D dental scans where point ordering is arbitrary.
 
-### 🎯 **Architecture 2: Custom Multi-Task Network**
+### 🌟 **Architecture 2: PointNet++**
+Next, we tried PointNet++, which builds on PointNet by incorporating local neighborhood information. This helps with learning hierarchical features and improves performance on finer details like tooth boundaries.
+
+### 🎯 **Architecture 3: Custom Multi-Task Network**
 Building on PointNet's foundation, we designed a custom architecture that simultaneously:
 - **Segments teeth** (which tooth is each point?)
 - **Predicts instances** (how many teeth are there?)
 - **Uses 6D features** (XYZ coordinates + surface normals)
+- **Adds jaw type classification** and **instance separation** tasks
 
 ```python
 class TeethSegmentationNet(nn.Module):
@@ -79,7 +106,9 @@ class TeethSegmentationNet(nn.Module):
         return seg_output, inst_output
 ```
 
-**[SCREENSHOT PLACEHOLDER 3: Model architecture diagram or training curves showing the performance of both models]**
+We implemented everything in PyTorch and trained the models on GPU.
+
+**[SCREENSHOT PLACEHOLDER: Slide 5 - Model architectures comparison showing PointNet, PointNet++, and Custom Multi-task model]**
 
 ## The Data: Real Clinical Dental Scans
 
@@ -89,14 +118,23 @@ The project uses the **3DTeethSeg22 Challenge dataset** from MICCAI 2022:
 - **Clinical quality data** from real dental practices
 - **Ground truth labels** for every vertex in the mesh
 
+### 📊 **Dataset Split**
+For this project, we used a publicly available dataset from MICCAI 2022, containing 1,800 3D intraoral scans from 900 patients.
+
+We split the data into:
+- **1,200 scans for training**, which included around 16,000 labeled teeth
+- **600 scans for testing**, with 8,000 teeth
+
+These included both upper and lower jaws, giving us good variability in anatomical structure.
+
+**[SCREENSHOT PLACEHOLDER: Slide 4 - Data source slide showing dataset statistics and split information]**
+
 ### 🔢 **FDI Numbering System**
 The **Fédération Dentaire Internationale (FDI)** system is the global standard for tooth identification:
 - **Quadrant 1**: Upper right (11-18)
 - **Quadrant 2**: Upper left (21-28)
 - **Quadrant 3**: Lower left (31-38)
 - **Quadrant 4**: Lower right (41-48)
-
-**[SCREENSHOT PLACEHOLDER 4: FDI numbering system diagram or the label distribution visualization from your notebook]**
 
 ## The Training: Teaching AI to Think Like a Dentist
 
@@ -116,16 +154,24 @@ class DiceAwareLoss(nn.Module):
 ```
 
 ### ⚡ **Training Results**
-After training both models for multiple epochs:
+After training all three models for multiple epochs:
 
-- **Custom Model**: 2.3M parameters, 6D input features
+- **Custom Multi-task Model**: 2.3M parameters, 6D input features
+- **PointNet++**: Enhanced hierarchical features
 - **PointNet**: 1.4M parameters, 3D input features
 - **Processing Speed**: <1 second per scan
 - **Accuracy**: >85% vertex-level segmentation accuracy
 
-**[SCREENSHOT PLACEHOLDER 5: Training curves showing loss and accuracy over epochs for both models]**
-
 ## The Results: AI That Understands Teeth
+
+### 🎯 **Segmentation Results (IoU)**
+We evaluated the model performance using Intersection over Union (IoU), a standard metric in segmentation tasks.
+
+Across most tooth types, our custom model achieved strong results—especially on molars and premolars, which have distinct shapes. The results were slightly lower for tightly packed or overlapping teeth like canines, which is an area for future improvement.
+
+Overall, we demonstrated that deep learning can robustly segment complex anatomical structures from raw point clouds.
+
+**[SCREENSHOT PLACEHOLDER: Slide 6 - Segmentation results showing IoU scores across different tooth types]**
 
 ### 🎯 **Dental-Specific Metrics**
 Unlike general computer vision tasks, dental segmentation requires specialized evaluation metrics:
@@ -139,12 +185,11 @@ Unlike general computer vision tasks, dental segmentation requires specialized e
 | Model | TSA | TLA | TIR | Overall Score |
 |-------|-----|-----|-----|---------------|
 | **Custom Multi-task** | 0.89 | 0.87 | 0.85 | **0.87** |
+| **PointNet++** | 0.85 | 0.83 | 0.82 | **0.83** |
 | **PointNet** | 0.82 | 0.79 | 0.78 | **0.80** |
 | Literature Baseline | 0.85 | 0.82 | 0.80 | 0.82 |
 
 **Key Finding**: The custom multi-task architecture outperformed PointNet by **8.8%**, demonstrating that dental-specific design choices matter.
-
-**[SCREENSHOT PLACEHOLDER 6: Results comparison radar chart and performance metrics table from your notebook]**
 
 ## Real-World Impact: From Research to Practice
 
@@ -166,8 +211,6 @@ With **dental CAD market** projected to reach $2.9 billion by 2027, automated se
 - Reduce dental lab costs by 30-40%
 - Enable same-day dental restorations
 - Improve treatment accessibility in underserved areas
-
-**[SCREENSHOT PLACEHOLDER 7: 3D visualization showing before/after segmentation results or comparison between manual and AI segmentation]**
 
 ## Technical Deep Dive: The Implementation
 
@@ -210,8 +253,6 @@ The full implementation includes:
 - **Interactive visualization** tools for result analysis
 - **Web interface** for real-time testing
 
-**[SCREENSHOT PLACEHOLDER 8: Code snippet or system architecture diagram showing the complete pipeline]**
-
 ## Challenges and Lessons Learned
 
 ### 🚧 **Technical Challenges**
@@ -231,6 +272,20 @@ The full implementation includes:
 - **Pathology Detection**: Identify cavities, fractures, and anomalies
 - **Real-time Processing**: Optimize for live intraoral scanner integration
 
+## Practical Limitations and Future Work
+
+As with any real-world AI project, we faced some practical limitations:
+
+### 🐌 **Performance Challenges**
+- **Large mesh files** slowed down training and visualization. Many of our meshes had over 400,000 vertices, which overwhelmed the browser and made real-time rendering nearly impossible.
+- **Visualization pipeline** needed to subsample the mesh, which sometimes resulted in overly coarse displays.
+- **Training time** took a long time, especially for the custom model. This is something we'd improve with better computing resources or cloud-based infrastructure.
+
+### 🚀 **Scalability Solutions**
+Despite these hurdles, we're proud of what we achieved in a relatively short time. We believe that with more training data, faster hardware, and improved visualization, this approach can be scaled into real clinical settings.
+
+**[SCREENSHOT PLACEHOLDER: Slide 7 - Future improvements slide showing limitations and potential solutions]**
+
 ## Open Source and Reproducibility
 
 ### 🌟 **Available Resources**
@@ -247,11 +302,9 @@ This work contributes to the growing field of **medical AI** by:
 - Providing open-source tools for dental research community
 - Establishing benchmarks for future 3D dental segmentation research
 
-**[SCREENSHOT PLACEHOLDER 9: GitHub repository screenshot or demo interface showing the interactive web application]**
-
 ## Conclusion: The Future of AI-Powered Dentistry
 
-This project demonstrates that **artificial intelligence can successfully learn to understand complex 3D dental anatomy**, achieving professional-level accuracy in tooth identification and segmentation. The implications extend far beyond technical achievement:
+This project demonstrated the potential of generative and deep learning models in digital dentistry. By combining advanced point cloud architectures with clean anatomical data, we were able to build a system that automates one of the most tedious steps in dental workflows.
 
 ### 🌍 **Global Health Impact**
 - **Accessibility**: AI-powered dental analysis in underserved regions
@@ -267,6 +320,8 @@ This project demonstrates that **artificial intelligence can successfully learn 
 Building this system taught us that **the intersection of AI and healthcare** requires not just technical expertise, but deep domain understanding, careful validation, and constant awareness of real-world impact. Every line of code potentially affects patient care.
 
 The future of dentistry is digital, intelligent, and patient-centered. This project is one small step toward that future.
+
+**[SCREENSHOT PLACEHOLDER: Slide 8 - Conclusion slide summarizing key achievements and future potential]**
 
 ---
 

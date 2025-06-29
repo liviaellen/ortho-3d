@@ -102,6 +102,15 @@ def load_real_dental_data():
                         label_id = instance['labelId']
                         labels[indices] = label_id
         
+        # Ensure labels match vertices
+        if len(labels) != len(vertices):
+            st.warning(f"⚠️ Label count ({len(labels)}) doesn't match vertex count ({len(vertices)})")
+            # Pad with zeros or truncate as needed
+            if len(labels) < len(vertices):
+                labels = np.pad(labels, (0, len(vertices) - len(labels)), constant_values=0)
+            else:
+                labels = labels[:len(vertices)]
+        
         return vertices, faces, labels, None
         
     except Exception as e:
@@ -159,32 +168,89 @@ def create_sample_mesh():
     
     return vertices, faces, labels
 
-def visualize_mesh(vertices, faces, labels=None, title="3D Mesh", max_vertices=10000):
+def get_tooth_color(label):
+    """Get distinctive color for each tooth type."""
+    tooth_colors = {
+        11: '#FF6B6B', 12: '#4ECDC4', 13: '#45B7D1', 14: '#96CEB4', 15: '#FECA57', 16: '#FF9FF3', 17: '#54A0FF', 18: '#5F27CD',
+        21: '#FF3838', 22: '#00D2D3', 23: '#0984E3', 24: '#00B894', 25: '#FDCB6E', 26: '#FD79A8', 27: '#2D98DA', 28: '#8C7AE6',
+        31: '#E17055', 32: '#00CEC9', 33: '#74B9FF', 34: '#55A3FF', 35: '#FDCB6E', 36: '#E84393', 37: '#6C5CE7', 38: '#A29BFE',
+        41: '#D63031', 42: '#00B894', 43: '#0984E3', 44: '#00CEC9', 45: '#E17055', 46: '#FD79A8', 47: '#6C5CE7', 48: '#A29BFE',
+        0: '#DDD'  # Gingiva/background
+    }
+    return tooth_colors.get(label, '#888')
+
+def visualize_mesh(vertices, faces, labels=None, title="3D Mesh", max_vertices=20000):
     """Create 3D visualization with optional subsampling for large meshes."""
-    # Subsample if mesh is too large for smooth visualization
+    
+    # For large meshes, use point cloud visualization which is more efficient
     if len(vertices) > max_vertices:
-        step = len(vertices) // max_vertices
-        vertex_indices = np.arange(0, len(vertices), step)
-        vertices_vis = vertices[vertex_indices]
-        
+        # Smart subsampling: keep more vertices from teeth (non-zero labels)
         if labels is not None:
-            labels_vis = labels[vertex_indices]
-        else:
-            labels_vis = None
+            # Get teeth vertices (non-zero labels)
+            teeth_mask = labels > 0
+            teeth_vertices = vertices[teeth_mask]
+            teeth_labels = labels[teeth_mask]
             
-        # Create simplified faces (just use original faces that reference valid vertices)
-        faces_vis = []
-        for face in faces:
-            if all(v < len(vertices_vis) for v in face):
-                faces_vis.append(face)
-        
-        if len(faces_vis) == 0:
-            # If no valid faces, create point cloud visualization
-            if labels_vis is not None:
-                colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels_vis]
+            # Get background vertices
+            bg_mask = labels == 0
+            bg_vertices = vertices[bg_mask]
+            
+            # Subsample background more aggressively
+            if len(teeth_vertices) > max_vertices // 2:
+                teeth_step = len(teeth_vertices) // (max_vertices // 2)
+                teeth_indices = np.arange(0, len(teeth_vertices), teeth_step)
+                teeth_vertices = teeth_vertices[teeth_indices]
+                teeth_labels = teeth_labels[teeth_indices]
+            
+            if len(bg_vertices) > max_vertices // 4:
+                bg_step = len(bg_vertices) // (max_vertices // 4)
+                bg_indices = np.arange(0, len(bg_vertices), bg_step)
+                bg_vertices = bg_vertices[bg_indices]
+                bg_labels = np.zeros(len(bg_vertices), dtype=int)
             else:
-                colors = ['lightblue'] * len(vertices_vis)
+                bg_labels = np.zeros(len(bg_vertices), dtype=int)
             
+            # Combine
+            vertices_vis = np.vstack([teeth_vertices, bg_vertices])
+            labels_vis = np.hstack([teeth_labels, bg_labels])
+        else:
+            # No labels, just subsample uniformly
+            step = len(vertices) // max_vertices
+            vertex_indices = np.arange(0, len(vertices), step)
+            vertices_vis = vertices[vertex_indices]
+            labels_vis = None
+        
+        # Create point cloud visualization
+        if labels_vis is not None:
+            colors = [get_tooth_color(label) for label in labels_vis]
+            
+            # Create separate traces for each tooth to show in legend
+            unique_labels = np.unique(labels_vis)
+            traces = []
+            
+            for label in unique_labels:
+                mask = labels_vis == label
+                if np.any(mask):
+                    tooth_vertices = vertices_vis[mask]
+                    tooth_name = f"Tooth {label}" if label > 0 else "Gingiva"
+                    
+                    traces.append(go.Scatter3d(
+                        x=tooth_vertices[:, 0],
+                        y=tooth_vertices[:, 1],
+                        z=tooth_vertices[:, 2],
+                        mode='markers',
+                        marker=dict(
+                            size=1.5,
+                            color=get_tooth_color(label),
+                            opacity=0.8 if label > 0 else 0.3
+                        ),
+                        name=tooth_name,
+                        showlegend=label > 0  # Only show teeth in legend, not gingiva
+                    ))
+            
+            fig = go.Figure(data=traces)
+        else:
+            colors = ['lightblue'] * len(vertices_vis)
             fig = go.Figure(data=[
                 go.Scatter3d(
                     x=vertices_vis[:, 0],
@@ -199,30 +265,10 @@ def visualize_mesh(vertices, faces, labels=None, title="3D Mesh", max_vertices=1
                     name="Points"
                 )
             ])
-        else:
-            faces_vis = np.array(faces_vis)
-            if labels_vis is not None:
-                colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels_vis]
-            else:
-                colors = ['lightblue'] * len(vertices_vis)
-            
-            fig = go.Figure(data=[
-                go.Mesh3d(
-                    x=vertices_vis[:, 0],
-                    y=vertices_vis[:, 1],
-                    z=vertices_vis[:, 2],
-                    i=faces_vis[:, 0],
-                    j=faces_vis[:, 1],
-                    k=faces_vis[:, 2],
-                    vertexcolor=colors,
-                    opacity=0.8,
-                    name="Mesh"
-                )
-            ])
     else:
-        # Use full mesh
+        # Use full mesh for smaller datasets
         if labels is not None:
-            colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels]
+            colors = [get_tooth_color(label) for label in labels]
         else:
             colors = ['lightblue'] * len(vertices)
         
@@ -246,10 +292,14 @@ def visualize_mesh(vertices, faces, labels=None, title="3D Mesh", max_vertices=1
             xaxis_title='X (mm)',
             yaxis_title='Y (mm)',
             zaxis_title='Z (mm)',
-            aspectmode='cube'
+            aspectmode='cube',
+            camera=dict(
+                eye=dict(x=1.5, y=1.5, z=1.5)
+            )
         ),
-        width=700,
-        height=500
+        width=800,
+        height=600,
+        showlegend=True
     )
     
     return fig
@@ -376,20 +426,37 @@ def main():
                 if hasattr(st.session_state, 'labels'):
                     unique_labels = np.unique(st.session_state.labels)
                     non_zero_labels = unique_labels[unique_labels > 0]
+                    teeth_vertices = np.sum(st.session_state.labels > 0)
+                    gingiva_vertices = np.sum(st.session_state.labels == 0)
+                    
                     st.info(f"🦷 Teeth found: {len(non_zero_labels)} unique FDI IDs")
+                    st.info(f"📊 Teeth vertices: {teeth_vertices:,} | Gingiva vertices: {gingiva_vertices:,}")
                     
                     if len(non_zero_labels) > 0:
                         st.write(f"**FDI Labels:** {', '.join(map(str, sorted(non_zero_labels)))}")
                 
+                # Visualization quality control
+                if is_real:
+                    viz_quality = st.selectbox(
+                        "Visualization Quality:",
+                        ["High (50K points)", "Medium (20K points)", "Low (10K points)"],
+                        index=1
+                    )
+                    max_vertices = {"High (50K points)": 50000, "Medium (20K points)": 20000, "Low (10K points)": 10000}[viz_quality]
+                else:
+                    max_vertices = 20000
+                
                 # Visualize original mesh
                 title = "Real Clinical Dental Scan" if is_real else "Sample Dental Mesh"
-                fig = visualize_mesh(
-                    st.session_state.vertices, 
-                    st.session_state.faces,
-                    st.session_state.labels,
-                    title
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                with st.spinner("Rendering 3D visualization..."):
+                    fig = visualize_mesh(
+                        st.session_state.vertices, 
+                        st.session_state.faces,
+                        st.session_state.labels,
+                        title,
+                        max_vertices=max_vertices
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.subheader("🔮 Segmentation")
@@ -423,13 +490,15 @@ def main():
                         st.metric("Process Time", f"{processing_time:.1f}s")
                     
                     # Visualize segmented result
-                    fig_seg = visualize_mesh(
-                        st.session_state.vertices,
-                        st.session_state.faces,
-                        st.session_state.pred_labels,
-                        "Segmentation Result"
-                    )
-                    st.plotly_chart(fig_seg)
+                    with st.spinner("Rendering segmentation result..."):
+                        fig_seg = visualize_mesh(
+                            st.session_state.vertices,
+                            st.session_state.faces,
+                            st.session_state.pred_labels,
+                            "Segmentation Result",
+                            max_vertices=20000
+                        )
+                        st.plotly_chart(fig_seg, use_container_width=True)
                     
                     # Label distribution
                     unique_labels, counts = np.unique(st.session_state.pred_labels, return_counts=True)
@@ -466,6 +535,78 @@ def main():
                         color='FDI Label'
                     )
                     st.plotly_chart(fig_bar, use_container_width=True)
+                    
+                    # Tooth condition classification
+                    st.subheader("🔍 Tooth Condition Analysis")
+                    
+                    if st.button("🦷 Analyze Tooth Conditions"):
+                        with st.spinner("Analyzing individual tooth conditions..."):
+                            # Extract individual teeth
+                            teeth_data = extract_individual_teeth(
+                                st.session_state.vertices, 
+                                st.session_state.pred_labels
+                            )
+                            
+                            if teeth_data:
+                                # Classify conditions
+                                classification_results = classify_tooth_conditions(teeth_data)
+                                
+                                # Store results
+                                st.session_state.tooth_conditions = classification_results
+                                
+                                st.success(f"✅ Analyzed {len(classification_results)} teeth!")
+                            else:
+                                st.warning("⚠️ No individual teeth detected for analysis")
+                    
+                    # Show tooth condition results
+                    if hasattr(st.session_state, 'tooth_conditions'):
+                        st.subheader("🦷 Individual Tooth Conditions")
+                        
+                        # Create condition summary
+                        condition_summary = {}
+                        for tooth_id, result in st.session_state.tooth_conditions.items():
+                            condition = result['condition']
+                            if condition not in condition_summary:
+                                condition_summary[condition] = 0
+                            condition_summary[condition] += 1
+                        
+                        # Display summary
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
+                            healthy_count = condition_summary.get('Healthy', 0)
+                            st.metric("Healthy Teeth", healthy_count, 
+                                     delta=f"{healthy_count/len(st.session_state.tooth_conditions)*100:.0f}%")
+                        with col_b:
+                            problem_count = len(st.session_state.tooth_conditions) - healthy_count
+                            st.metric("Need Attention", problem_count,
+                                     delta=f"{problem_count/len(st.session_state.tooth_conditions)*100:.0f}%")
+                        with col_c:
+                            avg_confidence = np.mean([r['confidence'] for r in st.session_state.tooth_conditions.values()])
+                            st.metric("Avg Confidence", f"{avg_confidence:.2f}")
+                        
+                        # Detailed table
+                        condition_data = []
+                        for tooth_id, result in st.session_state.tooth_conditions.items():
+                            condition_data.append({
+                                'FDI ID': tooth_id,
+                                'Condition': result['condition'],
+                                'Confidence': f"{result['confidence']:.2f}",
+                                'Status': '✅' if result['condition'] == 'Healthy' else '⚠️'
+                            })
+                        
+                        condition_df = pd.DataFrame(condition_data)
+                        st.dataframe(condition_df, use_container_width=True)
+                        
+                        # Condition distribution chart
+                        condition_names = list(condition_summary.keys())
+                        condition_counts = list(condition_summary.values())
+                        
+                        fig_conditions = px.pie(
+                            values=condition_counts,
+                            names=condition_names,
+                            title='Distribution of Tooth Conditions'
+                        )
+                        st.plotly_chart(fig_conditions, use_container_width=True)
             else:
                 st.info("👆 Generate sample data first!")
     
