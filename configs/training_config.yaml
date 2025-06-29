@@ -1,0 +1,70 @@
+# PyTorch Training Configuration for 3D Teeth Segmentation
+
+# Model Configuration
+model:
+  name: "custom"  # Options: "pointnet", "pointnet++", "custom"
+  num_classes: 49
+  num_instances: 32
+  input_dim: 6  # XYZ + Normals
+
+# Data Configuration
+data:
+  data_dir: "./data"  # Change this to your data directory
+  batch_size: 8       # Reduce if you have memory issues
+  num_workers: 2      # Reduce if you have issues
+  num_points: 1024    # Start smaller for testing
+  pin_memory: true
+  augment: true
+  normalize: true
+  use_normals: true
+  use_colors: false
+  cache_data: false
+
+# Training Configuration
+training:
+  num_epochs: 100
+  learning_rate: 0.001
+  weight_decay: 1e-4
+  save_every: 10
+  early_stopping_patience: 20
+  
+# Loss Configuration
+loss:
+  dice_weight: 0.5
+  class_weights: null  # Optional: [weight1, weight2, ...]
+
+# Optimizer Configuration
+optimizer:
+  type: "adam"
+  lr_scheduler:
+    type: "reduce_on_plateau"
+    mode: "min"
+    factor: 0.5
+    patience: 10
+
+# Directories
+paths:
+  save_dir: "./checkpoints"
+  log_dir: "./logs"
+  data_dir: "./data"
+
+# Device Configuration
+device: "auto"  # Options: "auto", "cuda", "cpu"
+
+# Logging Configuration
+logging:
+  tensorboard: true
+  wandb: false
+  wandb_project: "teeth_segmentation"
+  log_level: "INFO"
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "accuracy"
+    - "precision"
+    - "recall"
+  save_predictions: true
+  visualize_results: true

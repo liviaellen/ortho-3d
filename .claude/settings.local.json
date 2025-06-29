@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python run_examples.py:*)",
+      "Bash(grep:*)",
+      "Bash(touch:*)",
+      "Bash(python:*)",
+      "Bash(rm:*)",
+      "Bash(rg:*)"
+    ],
+    "deny": []
+  }
+}
