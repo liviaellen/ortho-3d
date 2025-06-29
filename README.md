@@ -1,17 +1,14 @@
-![alt text](assets/Grand-Challenge-Banner.jpeg)
+
 # 3D Teeth Scan Segmentation and Labeling Challenge
 
-This repository contains an enhanced implementation of the 3DTeethSeg22 challenge, originally associated with MICCAI 2022 and organized by [Udini](https://www.udini.ai/) (France) in collaboration with [Inria Grenoble Morpheo team](https://team.inria.fr/morpheo/) (France) and the [Digital Research Center of Sfax](http://www.crns.rnrt.tn/) (Tunisia).
+
 
 **Authors:** Livia Ellen & Vitoria Lara Soria
 
-## Modifications and Enhancements
-
-This implementation extends the original challenge framework with several key improvements:
 
 ### Enhanced Deep Learning Pipeline
 - **PyTorch Integration**: Complete PyTorch-based training and inference pipeline
-- **Multiple Model Architectures**: 
+- **Multiple Model Architectures**:
   - PointNet for basic point cloud segmentation
   - PointNet++ for hierarchical feature learning
   - Custom TeethSegmentationNet for multi-task learning
@@ -36,17 +33,17 @@ This implementation extends the original challenge framework with several key im
 ## Description
 
 ### Overview
-Computer-aided design (CAD) tools have become increasingly popular in modern dentistry for highly accurate treatment 
-planning. In particular, in orthodontic CAD systems, advanced intraoral scanners (IOSs) are now widely used as they 
-provide precise digital surface models of the dentition. Such models can dramatically help dentists simulate teeth 
-extraction, move, deletion, and rearrangement and ease therefore the prediction of treatment outcomes. Hence, 
+Computer-aided design (CAD) tools have become increasingly popular in modern dentistry for highly accurate treatment
+planning. In particular, in orthodontic CAD systems, advanced intraoral scanners (IOSs) are now widely used as they
+provide precise digital surface models of the dentition. Such models can dramatically help dentists simulate teeth
+extraction, move, deletion, and rearrangement and ease therefore the prediction of treatment outcomes. Hence,
 digital teeth models have the potential to release dentists from otherwise tedious and time consuming tasks.
 
 ### Problem Statement
 Although IOSs are becoming widespread in clinical dental practice, there are only few contributions on teeth
-segmentation/labeling available in the literature and no publicly available database. A fundamental issue that 
-appears with IOS data is the ability to reliably segment and identify teeth in scanned observations. 
-Teeth segmentation and labeling is difficult as a result of the inherent similarities between teeth shapes as well 
+segmentation/labeling available in the literature and no publicly available database. A fundamental issue that
+appears with IOS data is the ability to reliably segment and identify teeth in scanned observations.
+Teeth segmentation and labeling is difficult as a result of the inherent similarities between teeth shapes as well
 as their ambiguous positions on jaws.
 
 ### Technical Challenges
@@ -71,7 +68,7 @@ The 3D teeth segmentation task faces several technical challenges:
 #### Evaluation Framework
 The challenge employs three complementary metrics:
 
-1. **Teeth Localization Accuracy (TLA)**: 
+1. **Teeth Localization Accuracy (TLA)**:
    - Measures normalized Euclidean distance between GT and predicted centroids
    - Accounts for tooth size variation through normalization
    - Penalty of 5× tooth size for missing detections
@@ -117,16 +114,16 @@ year={2022}
 The data is provided under the [CC BY-NC-ND 4.0 License](https://creativecommons.org/licenses/by-nc-nd/4.0/)
 
 ### Data
-A total of 1800 3D intra-oral scans have been collected for 900 patients covering their upper and lower jaws separately. 
+A total of 1800 3D intra-oral scans have been collected for 900 patients covering their upper and lower jaws separately.
 
 The ground truth tooth labels and tooth instances for each vertex in the obj
 files are provided in JavaScript Object Notation (JSON) format. A JSON file
 example is shown below:
 ```python
 {
-    "id_patient": "6X24ILNE", 
+    "id_patient": "6X24ILNE",
     "jaw": "upper",
-    "labels": [0, 0, 44, 33, 34, 0, 0, 45, 0, .. ,41,  0, 0, 37, 0, 34, 45, 0, 31, 36], 
+    "labels": [0, 0, 44, 33, 34, 0, 0, 45, 0, .. ,41,  0, 0, 37, 0, 34, 45, 0, 31, 36],
     "instances": [0, 0, 10, 2, 12, 0, 0, 9, 0, 0, .. , 10, 0, 0, 8, 0, 0, 9, 0, 1, 8, 13],
 }
 ```
@@ -152,18 +149,18 @@ Two dataset train/test splits are provided , which specify the samples to consid
 ### Metrics
 * Teeth localization accuracy (TLA):
 
-calculated as the mean of normalized Euclidean distance between ground truth (GT) teeth centroids and the closest localized teeth centroid. 
-Each computed Euclidean distance is normalized by the size of the corresponding GT tooth. 
-In case of no centroid (e.g. algorithm crashes or missing output for a given scan) a nominal penalty of 5 per GT tooth 
+calculated as the mean of normalized Euclidean distance between ground truth (GT) teeth centroids and the closest localized teeth centroid.
+Each computed Euclidean distance is normalized by the size of the corresponding GT tooth.
+In case of no centroid (e.g. algorithm crashes or missing output for a given scan) a nominal penalty of 5 per GT tooth
 will be given. This corresponds to a distance 5 times the actual GT tooth size. As the number of teeth per patient may
 be variable, here the mean is computed over all gathered GT Teeth in the two testing sets.
 
-* Teeth identification rate (TIR): 
+* Teeth identification rate (TIR):
 
 is computed as the percentage of true identification cases relatively to all GT teeth in the two testing sets. A true identification is considered when for a given GT Tooth, the closest detected tooth centroid : is localized at a distance under half of the GT tooth size, and is attributed the same label as the GT tooth
-* Teeth segmentation accuracy (TSA): 
+* Teeth segmentation accuracy (TSA):
 
-is computed as the average F1-score over all instances of teeth point clouds. 
+is computed as the average F1-score over all instances of teeth point clouds.
 The F1-score of each tooth instance is measured as:
 F1=2*(precision * recall)/(precision+recall)
 
@@ -313,9 +310,8 @@ labels, instances = algorithm.process('path/to/scan.obj')
 ### Datasets and Benchmarks
 20. **Antonelli, M., et al.** (2022). "The Medical Segmentation Decathlon." *Nature Communications*, 13(1), 4128.
 
-## License 
+## License
 The rest of this repository is under the [MIT License](https://choosealicense.com/licenses/mit/).
 
 ## Contact
 For queries and issues not fit for a github issue, please email [Achraf Ben Hamadou](mailto:achraf.benhamadou@crns.rnrt.tn) .
-
