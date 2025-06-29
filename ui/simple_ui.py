@@ -18,6 +18,8 @@ import sys
 import os
 import tempfile
 import time
+import json
+import trimesh
 
 # Add parent directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -60,6 +62,50 @@ def test_models():
         }
     except Exception as e:
         return False, str(e)
+
+def load_real_dental_data():
+    """Load real dental scan data from teeth3ds_sample directory."""
+    try:
+        # Check if we have the copied data first
+        obj_path = os.path.join('data', 'scans', 'real_patient_01F4JV8X_upper.obj')
+        json_path = os.path.join('data', 'labels', 'real_patient_01F4JV8X_upper.json')
+        
+        if not os.path.exists(obj_path):
+            # Try original location
+            obj_path = os.path.join('teeth3ds_sample', '01F4JV8X', '01F4JV8X_upper.obj')
+            json_path = os.path.join('teeth3ds_sample', '01F4JV8X', '01F4JV8X_upper.json')
+        
+        if not os.path.exists(obj_path) or not os.path.exists(json_path):
+            return None, None, None, "Real dental data not found"
+        
+        # Load mesh using trimesh
+        mesh = trimesh.load(obj_path)
+        vertices = mesh.vertices
+        faces = mesh.faces
+        
+        # Load labels
+        with open(json_path, 'r') as f:
+            labels_data = json.load(f)
+        
+        # Extract labels array
+        if 'labels' in labels_data:
+            labels = np.array(labels_data['labels'])
+        elif isinstance(labels_data, list):
+            labels = np.array(labels_data)
+        else:
+            # Try to extract from instances
+            labels = np.zeros(len(vertices), dtype=int)
+            if 'instances' in labels_data:
+                for instance in labels_data['instances']:
+                    if 'pointIndices' in instance and 'labelId' in instance:
+                        indices = instance['pointIndices']
+                        label_id = instance['labelId']
+                        labels[indices] = label_id
+        
+        return vertices, faces, labels, None
+        
+    except Exception as e:
+        return None, None, None, f"Error loading data: {str(e)}"
 
 def create_sample_mesh():
     """Create a simple sample mesh for demonstration."""
@@ -113,27 +159,86 @@ def create_sample_mesh():
     
     return vertices, faces, labels
 
-def visualize_mesh(vertices, faces, labels=None, title="3D Mesh"):
-    """Create 3D visualization."""
-    if labels is not None:
-        # Color mapping for teeth
-        colors = [f'hsl({(label-10)*15}, 70%, 50%)' for label in labels]
+def visualize_mesh(vertices, faces, labels=None, title="3D Mesh", max_vertices=10000):
+    """Create 3D visualization with optional subsampling for large meshes."""
+    # Subsample if mesh is too large for smooth visualization
+    if len(vertices) > max_vertices:
+        step = len(vertices) // max_vertices
+        vertex_indices = np.arange(0, len(vertices), step)
+        vertices_vis = vertices[vertex_indices]
+        
+        if labels is not None:
+            labels_vis = labels[vertex_indices]
+        else:
+            labels_vis = None
+            
+        # Create simplified faces (just use original faces that reference valid vertices)
+        faces_vis = []
+        for face in faces:
+            if all(v < len(vertices_vis) for v in face):
+                faces_vis.append(face)
+        
+        if len(faces_vis) == 0:
+            # If no valid faces, create point cloud visualization
+            if labels_vis is not None:
+                colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels_vis]
+            else:
+                colors = ['lightblue'] * len(vertices_vis)
+            
+            fig = go.Figure(data=[
+                go.Scatter3d(
+                    x=vertices_vis[:, 0],
+                    y=vertices_vis[:, 1],
+                    z=vertices_vis[:, 2],
+                    mode='markers',
+                    marker=dict(
+                        size=2,
+                        color=colors,
+                        opacity=0.6
+                    ),
+                    name="Points"
+                )
+            ])
+        else:
+            faces_vis = np.array(faces_vis)
+            if labels_vis is not None:
+                colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels_vis]
+            else:
+                colors = ['lightblue'] * len(vertices_vis)
+            
+            fig = go.Figure(data=[
+                go.Mesh3d(
+                    x=vertices_vis[:, 0],
+                    y=vertices_vis[:, 1],
+                    z=vertices_vis[:, 2],
+                    i=faces_vis[:, 0],
+                    j=faces_vis[:, 1],
+                    k=faces_vis[:, 2],
+                    vertexcolor=colors,
+                    opacity=0.8,
+                    name="Mesh"
+                )
+            ])
     else:
-        colors = ['lightblue'] * len(vertices)
-    
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=vertices[:, 0],
-            y=vertices[:, 1],
-            z=vertices[:, 2],
-            i=faces[:, 0],
-            j=faces[:, 1],
-            k=faces[:, 2],
-            vertexcolor=colors,
-            opacity=0.8,
-            name="Mesh"
-        )
-    ])
+        # Use full mesh
+        if labels is not None:
+            colors = [f'hsl({(label)*20}, 70%, 50%)' for label in labels]
+        else:
+            colors = ['lightblue'] * len(vertices)
+        
+        fig = go.Figure(data=[
+            go.Mesh3d(
+                x=vertices[:, 0],
+                y=vertices[:, 1],
+                z=vertices[:, 2],
+                i=faces[:, 0],
+                j=faces[:, 1],
+                k=faces[:, 2],
+                vertexcolor=colors,
+                opacity=0.8,
+                name="Mesh"
+            )
+        ])
     
     fig.update_layout(
         title=title,
@@ -143,8 +248,8 @@ def visualize_mesh(vertices, faces, labels=None, title="3D Mesh"):
             zaxis_title='Z (mm)',
             aspectmode='cube'
         ),
-        width=600,
-        height=400
+        width=700,
+        height=500
     )
     
     return fig
@@ -222,29 +327,69 @@ def main():
         with col1:
             st.subheader("📂 Sample Data")
             
-            if st.button("🎲 Generate Sample Jaw"):
-                with st.spinner("Creating sample jaw mesh..."):
-                    vertices, faces, labels = create_sample_mesh()
-                    
-                    # Store in session state
-                    st.session_state.vertices = vertices
-                    st.session_state.faces = faces
-                    st.session_state.labels = labels
-                    
-                    st.success(f"✅ Generated mesh with {len(vertices)} vertices!")
+            # Data source selection
+            data_source = st.radio(
+                "Choose data source:",
+                ["🦷 Real Clinical Data", "🎲 Generated Sample"]
+            )
+            
+            if data_source == "🦷 Real Clinical Data":
+                if st.button("📥 Load Real Dental Scan"):
+                    with st.spinner("Loading real dental scan data..."):
+                        vertices, faces, labels, error = load_real_dental_data()
+                        
+                        if error:
+                            st.error(f"❌ {error}")
+                            st.info("💡 Falling back to generated sample data")
+                            vertices, faces, labels = create_sample_mesh()
+                        else:
+                            st.success(f"✅ Loaded real scan: {len(vertices):,} vertices!")
+                            st.info(f"📊 Patient ID: 01F4JV8X (Upper jaw)")
+                        
+                        # Store in session state
+                        st.session_state.vertices = vertices
+                        st.session_state.faces = faces
+                        st.session_state.labels = labels
+                        st.session_state.is_real_data = error is None
+            
+            else:  # Generated sample
+                if st.button("🎲 Generate Sample Jaw"):
+                    with st.spinner("Creating sample jaw mesh..."):
+                        vertices, faces, labels = create_sample_mesh()
+                        
+                        # Store in session state
+                        st.session_state.vertices = vertices
+                        st.session_state.faces = faces
+                        st.session_state.labels = labels
+                        st.session_state.is_real_data = False
+                        
+                        st.success(f"✅ Generated mesh with {len(vertices)} vertices!")
             
             # Show mesh info if generated
             if hasattr(st.session_state, 'vertices'):
-                st.info(f"Mesh loaded: {len(st.session_state.vertices)} vertices, {len(st.session_state.faces)} faces")
+                is_real = getattr(st.session_state, 'is_real_data', False)
+                data_type = "Real Clinical Data" if is_real else "Generated Sample"
+                
+                st.info(f"📋 {data_type}: {len(st.session_state.vertices):,} vertices, {len(st.session_state.faces):,} faces")
+                
+                # Show unique labels info
+                if hasattr(st.session_state, 'labels'):
+                    unique_labels = np.unique(st.session_state.labels)
+                    non_zero_labels = unique_labels[unique_labels > 0]
+                    st.info(f"🦷 Teeth found: {len(non_zero_labels)} unique FDI IDs")
+                    
+                    if len(non_zero_labels) > 0:
+                        st.write(f"**FDI Labels:** {', '.join(map(str, sorted(non_zero_labels)))}")
                 
                 # Visualize original mesh
+                title = "Real Clinical Dental Scan" if is_real else "Sample Dental Mesh"
                 fig = visualize_mesh(
                     st.session_state.vertices, 
                     st.session_state.faces,
                     st.session_state.labels,
-                    "Sample Dental Mesh"
+                    title
                 )
-                st.plotly_chart(fig)
+                st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.subheader("🔮 Segmentation")
@@ -290,9 +435,37 @@ def main():
                     unique_labels, counts = np.unique(st.session_state.pred_labels, return_counts=True)
                     label_df = pd.DataFrame({
                         'FDI Label': unique_labels,
-                        'Vertex Count': counts
+                        'Vertex Count': counts,
+                        'Percentage': (counts / len(st.session_state.pred_labels) * 100).round(2)
                     })
-                    st.dataframe(label_df)
+                    
+                    # Add tooth names for better understanding
+                    tooth_names = {
+                        11: 'Upper Right Central Incisor', 12: 'Upper Right Lateral Incisor',
+                        13: 'Upper Right Canine', 14: 'Upper Right First Premolar',
+                        15: 'Upper Right Second Premolar', 16: 'Upper Right First Molar',
+                        17: 'Upper Right Second Molar', 18: 'Upper Right Third Molar',
+                        21: 'Upper Left Central Incisor', 22: 'Upper Left Lateral Incisor',
+                        23: 'Upper Left Canine', 24: 'Upper Left First Premolar',
+                        25: 'Upper Left Second Premolar', 26: 'Upper Left First Molar',
+                        27: 'Upper Left Second Molar', 28: 'Upper Left Third Molar',
+                        0: 'Gingiva/Background'
+                    }
+                    
+                    label_df['Tooth Name'] = label_df['FDI Label'].map(tooth_names).fillna('Unknown')
+                    
+                    st.subheader("📊 Segmentation Results")
+                    st.dataframe(label_df[['FDI Label', 'Tooth Name', 'Vertex Count', 'Percentage']])
+                    
+                    # Create bar chart of label distribution
+                    fig_bar = px.bar(
+                        label_df, 
+                        x='FDI Label', 
+                        y='Vertex Count',
+                        title='Vertex Distribution by Tooth (FDI Labels)',
+                        color='FDI Label'
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
             else:
                 st.info("👆 Generate sample data first!")
     

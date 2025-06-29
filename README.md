@@ -1,6 +1,37 @@
 ![alt text](assets/Grand-Challenge-Banner.jpeg)
 # 3D Teeth Scan Segmentation and Labeling Challenge
-The challenge 3DTeethSeg22 is a first edition associated with MICCAI 2022. It is organized by [Udini](https://www.udini.ai/) (France) in collaboration with [Inria Grenoble Morpheo team](https://team.inria.fr/morpheo/) (France) and the [Digital Research Center of Sfax](http://www.crns.rnrt.tn/) (Tunisia).
+
+This repository contains an enhanced implementation of the 3DTeethSeg22 challenge, originally associated with MICCAI 2022 and organized by [Udini](https://www.udini.ai/) (France) in collaboration with [Inria Grenoble Morpheo team](https://team.inria.fr/morpheo/) (France) and the [Digital Research Center of Sfax](http://www.crns.rnrt.tn/) (Tunisia).
+
+**Authors:** Livia Ellen & Vitoria Lara Soria
+
+## Modifications and Enhancements
+
+This implementation extends the original challenge framework with several key improvements:
+
+### Enhanced Deep Learning Pipeline
+- **PyTorch Integration**: Complete PyTorch-based training and inference pipeline
+- **Multiple Model Architectures**: 
+  - PointNet for basic point cloud segmentation
+  - PointNet++ for hierarchical feature learning
+  - Custom TeethSegmentationNet for multi-task learning
+- **Advanced Data Loading**: Efficient data pipeline with augmentation support
+- **Training Infrastructure**: Comprehensive trainer with validation, checkpointing, and logging
+
+### Expanded Evaluation Framework
+- **Additional Metrics**: Beyond the original TLA, TIR, and TSA metrics:
+  - Precision and Recall components
+  - IoU (Intersection over Union) scores
+  - Dice coefficient calculations
+  - Per-tooth detailed analysis
+- **Enhanced Visualizations**: Interactive plotting and comparative analysis tools
+- **Statistical Analysis**: Comprehensive performance breakdowns
+
+### Improved Usability
+- **Modular Architecture**: Clean separation of concerns with dedicated modules for training, evaluation, and visualization
+- **Example Scripts**: Ready-to-use examples for training, inference, and evaluation
+- **Documentation**: Comprehensive usage examples and API documentation
+- **Flexible Configuration**: Easy-to-modify parameters for different experimental setups
 
 ## Description
 
@@ -226,15 +257,6 @@ algorithm = PyTorchSegmentationAlgorithm(
 # Run inference
 labels, instances = algorithm.process('path/to/scan.obj')
 ```
-### Leaderboard
-| Team     | Method | Exp(-TLA)  | TSA        | TIR        | SCORE      | Github link |
-|----------|--------|------------|------------|------------|------------|-------------|
-| CGIP     |    | 0.9658     | **0.9859** | 0.9100     | **0.9539** |             |
-| FiboSeg  |    | **0.9924** | 0.9293           | 0.9223     | 0.9480     |             |
-| IGIP     |    |         0.9244    |  0.9750          | **0.9289** | 0.9427     |             |
-| TeethSeg |    |      0.9184      |     0.9678       |       0.8538     | 0.9133     |             |
-| OS       |    |      0.7845      |     0.9693       |        0.8940     | 0.8826     |             |
-| Chompers |    |        0.6242     |         0.8886    |   0.8795         | 0.7974     |             |
 
 ## References
 
