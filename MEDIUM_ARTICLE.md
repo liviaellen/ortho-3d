@@ -12,6 +12,8 @@ This project represents the culmination of our journey into the intersection of 
 
 **[SCREENSHOT PLACEHOLDER: Slide 1 - Title slide showing "3D Teeth Segmentation and Generative AI" with our names and university affiliation]**
 
+**📹 Watch our full presentation**: [3D Teeth Segmentation and Generative AI Demo](https://www.loom.com/share/6ef4c8bb10a1471aa8c4faeb6233310b?sid=9055e537-0d61-46db-ba9a-4fb030b92396)
+
 ---
 
 ## The Problem: Why Dental AI Matters
@@ -59,6 +61,127 @@ We developed a comprehensive solution using cutting-edge neural architectures sp
 This pipeline allowed us to transform messy raw scans into structured, clinically meaningful data.
 
 **[SCREENSHOT PLACEHOLDER: Slide 3 - Algorithm pipeline diagram showing the 4-step process]**
+
+### 🎨 **Generative AI: VAE and Diffusion Models**
+
+Beyond segmentation, we explored generative AI approaches to understand and synthesize 3D dental structures. This represents the cutting edge of AI in dentistry—not just analyzing existing scans, but generating new ones.
+
+#### **Variational Autoencoder (VAE) for 3D Teeth**
+We implemented a VAE specifically designed for 3D point cloud generation:
+
+```python
+class TeethVAE(nn.Module):
+    def __init__(self, latent_dim=128):
+        super().__init__()
+        # Encoder: 3D points -> latent space
+        self.encoder = nn.Sequential(
+            nn.Conv1d(3, 64, 1),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Conv1d(64, 128, 1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Conv1d(128, 256, 1),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+        )
+
+        # Latent space
+        self.fc_mu = nn.Linear(256, latent_dim)
+        self.fc_var = nn.Linear(256, latent_dim)
+
+        # Decoder: latent space -> 3D points
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024 * 3),  # 1024 points * 3 coordinates
+        )
+
+    def encode(self, x):
+        # x: [batch, 3, num_points]
+        features = self.encoder(x)
+        features = torch.mean(features, dim=2)  # Global pooling
+        mu = self.fc_mu(features)
+        log_var = self.fc_var(features)
+        return mu, log_var
+
+    def decode(self, z):
+        # z: [batch, latent_dim]
+        decoded = self.decoder(z)
+        return decoded.view(-1, 3, 1024)  # Reshape to [batch, 3, num_points]
+
+    def forward(self, x):
+        mu, log_var = self.encode(x)
+        z = self.reparameterize(mu, log_var)
+        return self.decode(z), mu, log_var
+
+    def reparameterize(self, mu, log_var):
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+```
+
+**Key Innovation**: The VAE learns a compressed representation of dental anatomy in latent space, enabling:
+- **Data augmentation**: Generate synthetic dental scans for training
+- **Missing tooth reconstruction**: Fill gaps in incomplete scans
+- **Anatomical variation**: Explore different tooth configurations
+
+#### **Diffusion Models for Progressive Generation**
+We also experimented with diffusion models for more sophisticated 3D generation:
+
+```python
+class DiffusionTeethGenerator(nn.Module):
+    def __init__(self, timesteps=1000):
+        super().__init__()
+        self.timesteps = timesteps
+
+        # Noise scheduler
+        self.beta = torch.linspace(1e-4, 0.02, timesteps)
+        self.alpha = 1.0 - self.beta
+        self.alpha_bar = torch.cumprod(self.alpha, dim=0)
+
+        # U-Net for denoising
+        self.denoiser = TeethUNet(
+            input_channels=3,
+            output_channels=3,
+            time_embed_dim=128
+        )
+
+    def forward(self, x_0, t):
+        # Add noise to input
+        noise = torch.randn_like(x_0)
+        x_t = self.alpha_bar[t].sqrt().view(-1, 1, 1) * x_0 + \
+              (1 - self.alpha_bar[t]).sqrt().view(-1, 1, 1) * noise
+        return x_t, noise
+
+    def sample(self, batch_size, device):
+        # Generate from noise
+        x = torch.randn(batch_size, 3, 1024, device=device)
+
+        for t in reversed(range(self.timesteps)):
+            t_tensor = torch.full((batch_size,), t, device=device)
+            predicted_noise = self.denoiser(x, t_tensor)
+
+            # Denoising step
+            alpha_t = self.alpha[t]
+            alpha_bar_t = self.alpha_bar[t]
+            beta_t = self.beta[t]
+
+            x = (1 / alpha_t.sqrt()) * (x - (beta_t / (1 - alpha_bar_t).sqrt()) * predicted_noise)
+
+            if t > 0:
+                noise = torch.randn_like(x)
+                x = x + beta_t.sqrt() * noise
+
+        return x
+```
+
+**Applications in Dentistry**:
+- **Treatment Planning**: Generate "before/after" scenarios for orthodontic treatment
+- **Educational Tools**: Create diverse dental anatomy for training
+- **Research**: Explore anatomical variations and pathologies
 
 ### 🚀 **Architecture 1: PointNet**
 PointNet, pioneered by researchers at Stanford, was the first neural network capable of directly processing 3D point clouds without converting them to voxels or images.
@@ -108,7 +231,7 @@ class TeethSegmentationNet(nn.Module):
 
 We implemented everything in PyTorch and trained the models on GPU.
 
-**[SCREENSHOT PLACEHOLDER: Slide 5 - Model architectures comparison showing PointNet, PointNet++, and Custom Multi-task model]**
+**[SCREENSHOT PLACEHOLDER: Slide 5 - Model architectures comparison showing PointNet, PointNet++, Custom Multi-task model, VAE, and Diffusion models]**
 
 ## The Data: Real Clinical Dental Scans
 
@@ -332,7 +455,8 @@ Interested in exploring 3D dental AI? Here's how to get started:
 1. **📓 Download the Jupyter Notebook**: [Complete implementation with step-by-step explanations]
 2. **🦷 Try the Demo**: [Interactive web interface for testing]
 3. **📊 Explore the Data**: [3DTeethSeg22 Challenge dataset]
-4. **🔧 Fork the Code**: [GitHub repository with full source code](https://github.com/livia-ellen/ortho-3d)
+4. **🔧 Fork the Code**: [GitHub repository with full source code](https://github.com/liviaellen/ortho-3d)
+5. **📹 Watch Demo**: [Full project presentation and demo](https://www.loom.com/share/6ef4c8bb10a1471aa8c4faeb6233310b?sid=9055e537-0d61-46db-ba9a-4fb030b92396)
 
 ---
 
@@ -343,4 +467,4 @@ Interested in exploring 3D dental AI? Here's how to get started:
 ---
 
 ### Tags
-`#ArtificialIntelligence` `#DeepLearning` `#Healthcare` `#Dentistry` `#3DComputerVision` `#PyTorch` `#MedicalAI` `#DigitalHealth` `#MachineLearning` `#PointCloud`
+`#ArtificialIntelligence` `#DeepLearning` `#Healthcare` `#Dentistry` `#3DComputerVision` `#PyTorch` `#MedicalAI` `#DigitalHealth` `#MachineLearning` `#PointCloud` `#GenerativeAI` `#VAE` `#DiffusionModels`
